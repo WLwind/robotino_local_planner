@@ -27,9 +27,7 @@ namespace robotino_local_planner
       min_linear_vel_(0.0),
       max_rotation_vel_(0.0),
       min_rotation_vel_(0.0),
-      num_window_points_(10),
-      tf_stream_(tf_stream_nh_),
-      tf_stream_handle_(tf_stream_.addTransform("map", "base_link", boost::bind(&RobotinoLocalPlanner::poseCb, this, _1)))
+      num_window_points_(10)
   {
   }
 
@@ -38,16 +36,10 @@ namespace robotino_local_planner
     // Empty
   }
 
-  void RobotinoLocalPlanner::poseCb(const geometry_msgs::TransformStampedConstPtr& transform)
-  {
-    boost::mutex::scoped_lock lock(pose_lock_);
-    last_pose_ = transform->transform;
-  }
-
   void RobotinoLocalPlanner::initialize( std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros )
   {
     tf_ = tf;
-
+    costmap2dros_=costmap_ros;
     ros::NodeHandle private_nh("~/" + name);
 
     private_nh.param("heading_lookahead", heading_lookahead_, 0.3 );
@@ -152,14 +144,19 @@ namespace robotino_local_planner
     next_heading_pub_.publish(marker);
   }
 
-  void RobotinoLocalPlanner::displacementToGoal(const geometry_msgs::PoseStamped& goal, double& x, double& y, double& rotation) const
+  void RobotinoLocalPlanner::displacementToGoal(const geometry_msgs::PoseStamped& goal, double& x, double& y, double& rotation)
   {
     // Create a vector between the current pose to the next heading pose
-    x = goal.pose.position.x - last_pose_.translation.x;
-    y = goal.pose.position.y - last_pose_.translation.y;
+    if(costmap2dros_->getRobotPose(last_pose_))
+    {
+      x = goal.pose.position.x - last_pose_.getOrigin().getX();
+      y = goal.pose.position.y - last_pose_.getOrigin().getY();
+    }
+    else
+      ROS_WARN("Failed to get robot pose from costmap!");
 
     // Calculate the rotation between the current and the vector created above
-    rotation = angles::shortest_angular_distance(tf::getYaw(last_pose_.rotation), std::atan2(y, x));
+    rotation = angles::shortest_angular_distance(tf::getYaw(last_pose_.getRotation()), std::atan2(y, x));
   }
 
   bool RobotinoLocalPlanner::rotateToStart( geometry_msgs::Twist& cmd_vel )
@@ -205,7 +202,7 @@ namespace robotino_local_planner
     // We are approaching the goal position, slow down
     if( next_heading_index_ == (int) global_plan_.size()-1)
     {
-      const double distance_to_next_heading = linearDistance(last_pose_.translation, global_plan_[next_heading_index_].pose.position);
+      const double distance_to_next_heading = linearDistance(last_pose_, global_plan_[next_heading_index_].pose.position);
 
       // Reached the goal, now we can stop and rotate the robot to the goal position
       if (distance_to_next_heading < xy_goal_tolerance_)
@@ -226,7 +223,7 @@ namespace robotino_local_planner
     global_plan_[next_heading_index_].header.stamp = now;
 
     double rotation = tf::getYaw( global_plan_[next_heading_index_].pose.orientation ) -
-      tf::getYaw(last_pose_.rotation);
+      tf::getYaw(last_pose_.getRotation());
 
     if( fabs( rotation ) < yaw_goal_tolerance_ )
     {
@@ -251,7 +248,7 @@ namespace robotino_local_planner
 
       next_heading_pose = global_plan_[i];
 
-      double dist = linearDistance( last_pose_.translation,
+      double dist = linearDistance( last_pose_,
           next_heading_pose.pose.position );
 
       if( dist > heading_lookahead_)
@@ -333,6 +330,11 @@ namespace robotino_local_planner
   double RobotinoLocalPlanner::linearDistance(const geometry_msgs::Vector3& t, const geometry_msgs::Point& p )
   {
     return hypot(t.x - p.x, t.y - p.y);
+  }
+
+  double RobotinoLocalPlanner::linearDistance(const tf::Stamped<tf::Pose>& p1, const geometry_msgs::Point& p2 )
+  {
+    return hypot(p2.x - p1.getOrigin().getX(), p2.y - p1.getOrigin().getY());
   }
 
 }

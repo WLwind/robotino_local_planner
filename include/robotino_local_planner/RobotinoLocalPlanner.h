@@ -17,8 +17,6 @@
 #include <costmap_2d/costmap_2d_ros.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <tf_lookup/tf_stream_client.h>
-#include <tf_lookup/tf_stream_client_impl.h>
 
 namespace robotino_local_planner
 {
@@ -37,7 +35,7 @@ namespace robotino_local_planner
     void poseCb(const geometry_msgs::TransformStampedConstPtr& transform);
 
     void publishNextHeading(bool show = true);
-    void displacementToGoal(const geometry_msgs::PoseStamped& goal, double& x, double& y, double& rotation) const;
+    void displacementToGoal(const geometry_msgs::PoseStamped& goal, double& x, double& y, double& rotation);
     bool rotateToStart( geometry_msgs::Twist& cmd_vel );
     bool move( geometry_msgs::Twist& cmd_vel );
     bool rotateToGoal( geometry_msgs::Twist& cmd_vel );
@@ -46,6 +44,7 @@ namespace robotino_local_planner
     double calRotationVel( double rotation );
     double linearDistance(const geometry_msgs::Point& p1, const geometry_msgs::Point& p2 );
     double linearDistance(const geometry_msgs::Vector3& t, const geometry_msgs::Point& p );
+    double linearDistance(const tf::Stamped<tf::Pose>& p1, const geometry_msgs::Point& p2 );
 
     typedef enum { RotatingToStart, Moving, RotatingToGoal, Finished } State;
 
@@ -67,11 +66,10 @@ namespace robotino_local_planner
     int num_window_points_;
 
     ros::NodeHandle tf_stream_nh_;
-    tf_lookup::TfStreamClient tf_stream_;
-    tf_lookup::TfStreamClient::Handle tf_stream_handle_;
 
     boost::mutex pose_lock_;
-    geometry_msgs::Transform last_pose_;
+    tf::Stamped<tf::Pose> last_pose_;
+    costmap_2d::Costmap2DROS* costmap2dros_;
 
   };
 }
