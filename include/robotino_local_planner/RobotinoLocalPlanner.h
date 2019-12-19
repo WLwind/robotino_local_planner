@@ -26,7 +26,7 @@ namespace robotino_local_planner
     RobotinoLocalPlanner();
     ~RobotinoLocalPlanner();
 
-    void initialize( std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros );
+    void initialize( std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros );
     bool computeVelocityCommands( geometry_msgs::Twist& cmd_vel);
     bool isGoalReached();
     bool setPlan( const std::vector<geometry_msgs::PoseStamped>& global_plan );
@@ -44,11 +44,11 @@ namespace robotino_local_planner
     double calRotationVel( double rotation );
     double linearDistance(const geometry_msgs::Point& p1, const geometry_msgs::Point& p2 );
     double linearDistance(const geometry_msgs::Vector3& t, const geometry_msgs::Point& p );
-    double linearDistance(const tf::Stamped<tf::Pose>& p1, const geometry_msgs::Point& p2 );
+    double linearDistance(const geometry_msgs::PoseStamped& p1, const geometry_msgs::Point& p2 );
 
     typedef enum { RotatingToStart, Moving, RotatingToGoal, Finished } State;
 
-    tf::TransformListener* tf_;
+    tf2_ros::Buffer* tf_;
 
     std::vector<geometry_msgs::PoseStamped> global_plan_;
 
@@ -68,7 +68,7 @@ namespace robotino_local_planner
     ros::NodeHandle tf_stream_nh_;
 
     boost::mutex pose_lock_;
-    tf::Stamped<tf::Pose> last_pose_;
+    geometry_msgs::PoseStamped last_pose_;
     costmap_2d::Costmap2DROS* costmap2dros_;
 
   };

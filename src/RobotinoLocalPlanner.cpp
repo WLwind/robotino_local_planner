@@ -11,7 +11,7 @@
 #include <tf/transform_datatypes.h>
 #include <angles/angles.h>
 
-PLUGINLIB_DECLARE_CLASS(robotino_local_planner, RobotinoLocalPlanner, robotino_local_planner::RobotinoLocalPlanner, nav_core::BaseLocalPlanner)
+PLUGINLIB_EXPORT_CLASS(robotino_local_planner::RobotinoLocalPlanner,nav_core::BaseLocalPlanner)
 
 #define TRANSFORM_TIMEOUT 0.5
 #define PI 3.141592653
@@ -36,7 +36,7 @@ namespace robotino_local_planner
     // Empty
   }
 
-  void RobotinoLocalPlanner::initialize( std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros )
+  void RobotinoLocalPlanner::initialize( std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros )
   {
     tf_ = tf;
     costmap2dros_=costmap_ros;
@@ -149,14 +149,16 @@ namespace robotino_local_planner
     // Create a vector between the current pose to the next heading pose
     if(costmap2dros_->getRobotPose(last_pose_))
     {
-      x = goal.pose.position.x - last_pose_.getOrigin().getX();
-      y = goal.pose.position.y - last_pose_.getOrigin().getY();
+      x = goal.pose.position.x - last_pose_.pose.position.x;
+      y = goal.pose.position.y - last_pose_.pose.position.y;
     }
     else
       ROS_WARN("Failed to get robot pose from costmap!");
 
+    tf::Quaternion tfq;
+    tf::quaternionMsgToTF(last_pose_.pose.orientation, tfq);
     // Calculate the rotation between the current and the vector created above
-    rotation = angles::shortest_angular_distance(tf::getYaw(last_pose_.getRotation()), std::atan2(y, x));
+    rotation = angles::shortest_angular_distance(tf::getYaw(tfq), std::atan2(y, x));
   }
 
   bool RobotinoLocalPlanner::rotateToStart( geometry_msgs::Twist& cmd_vel )
@@ -221,9 +223,9 @@ namespace robotino_local_planner
   {
     ros::Time now = ros::Time::now();
     global_plan_[next_heading_index_].header.stamp = now;
-
-    double rotation = tf::getYaw( global_plan_[next_heading_index_].pose.orientation ) -
-      tf::getYaw(last_pose_.getRotation());
+    tf::Quaternion tfq;
+    tf::quaternionMsgToTF(last_pose_.pose.orientation,tfq);
+    double rotation = tf::getYaw( global_plan_[next_heading_index_].pose.orientation ) - tf::getYaw(tfq);
 
     if( fabs( rotation ) < yaw_goal_tolerance_ )
     {
@@ -332,9 +334,9 @@ namespace robotino_local_planner
     return hypot(t.x - p.x, t.y - p.y);
   }
 
-  double RobotinoLocalPlanner::linearDistance(const tf::Stamped<tf::Pose>& p1, const geometry_msgs::Point& p2 )
+  double RobotinoLocalPlanner::linearDistance(const geometry_msgs::PoseStamped& p1, const geometry_msgs::Point& p2 )
   {
-    return hypot(p2.x - p1.getOrigin().getX(), p2.y - p1.getOrigin().getY());
+    return hypot(p2.x - p1.pose.position.x, p2.y - p1.pose.position.y);
   }
 
 }
